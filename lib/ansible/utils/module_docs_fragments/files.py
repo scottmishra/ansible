@@ -19,13 +19,19 @@
 class ModuleDocFragment(object):
 
     # Standard files documentation fragment
+
+    # Note: mode is overridden by the copy and template modules so if you change the description
+    # here, you should also change it there.
     DOCUMENTATION = """
 options:
   mode:
     description:
-      - Mode the file or directory should be. For those used to I(/usr/bin/chmod) remember that modes are actually octal numbers (like C(0644) or C(01777)).
-        Leaving off the leading zero will likely have unexpected results.
-        As of version 1.8, the mode may be specified as a symbolic mode (for example, C(u+rwx) or C(u=rw,g=r,o=r)).
+      - "Mode the file or directory should be. For those used to I(/usr/bin/chmod) remember that modes are actually octal numbers.
+        You must either specify the leading zero so that Ansible's YAML parser knows it is an octal
+        number (like C(0644) or C(01777)) or quote it (like C('644') or C('0644') so Ansible
+        receives a string and can do its own conversion from string into number.  Giving Ansible a number
+        without following one of these rules will end up with a decimal number which will have unexpected results.
+        As of version 1.8, the mode may be specified as a symbolic mode (for example, C(u+rwx) or C(u=rw,g=r,o=r))."
   owner:
     description:
       - Name of the user that should own the file/directory, as would be fed to I(chown).
@@ -63,6 +69,7 @@ options:
     description:
       - Attributes the file or directory should have. To get supported flags look at the man page for I(chattr) on the target system.
         This string should contain the attributes in the same order as the one displayed by I(lsattr).
+      - C(=) operator is assumed as default, otherwise C(+) or C(-) operators need to be included in the string.
     aliases: ['attr']
     version_added: "2.3"
 """

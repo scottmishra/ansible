@@ -91,7 +91,7 @@ options:
       - ramdisk I(eri) to use for the instance
   wait:
     description:
-      - wait for the instance to reach its desired state before returning.  Does not wait for SSH, see 'wait_for' example for details.
+      - wait for the instance to reach its desired state before returning.  Does not wait for SSH, see 'wait_for_connection' example for details.
     type: bool
     default: 'no'
   wait_timeout:
@@ -134,7 +134,6 @@ options:
     description:
       - when provisioning within vpc, assign a public IP address. Boto library must be 2.13.0+
     type: bool
-    default: 'no'
   private_ip:
     version_added: "1.2"
     description:
@@ -180,8 +179,8 @@ options:
     description:
       - a list of hash/dictionaries of volumes to add to the new instance; '[{"key":"value", "key":"value"}]'; keys allowed
         are - device_name (str; required), delete_on_termination (bool; False), device_type (deprecated), ephemeral (str),
-        encrypted (bool; False), snapshot (str), volume_type (str), iops (int) - device_type is deprecated use volume_type,
-        iops must be set when volume_type='io1', ephemeral and snapshot are mutually exclusive.
+        encrypted (bool; False), snapshot (str), volume_type (str), volume_size (int, GB), iops (int) - device_type
+        is deprecated use volume_type, iops must be set when volume_type='io1', ephemeral and snapshot are mutually exclusive.
   ebs_optimized:
     version_added: "1.6"
     description:
@@ -360,7 +359,7 @@ EXAMPLES = '''
   hosts: localhost
   gather_facts: False
   vars:
-    key_name: my_keypair
+    keypair: my_keypair
     instance_type: m1.small
     security_group: my_securitygroup
     image: my_ami_id
@@ -385,12 +384,10 @@ EXAMPLES = '''
       with_items: "{{ ec2.instances }}"
 
     - name: Wait for SSH to come up
-      wait_for:
-        host: "{{ item.public_dns_name }}"
-        port: 22
+      delegate_to: "{{ item.public_dns_name }}"
+      wait_for_connection:
         delay: 60
         timeout: 320
-        state: started
       with_items: "{{ ec2.instances }}"
 
 - name: Configure instance(s)
@@ -1560,7 +1557,7 @@ def warn_if_public_ip_assignment_changed(module, instance):
 
     # Check that public ip assignment is the same and warn if not
     public_dns_name = getattr(instance, 'public_dns_name', None)
-    if (assign_public_ip or public_dns_name) and (not public_dns_name or not assign_public_ip):
+    if (assign_public_ip or public_dns_name) and (not public_dns_name or assign_public_ip is False):
         module.warn("Unable to modify public ip assignment to {0} for instance {1}. "
                     "Whether or not to assign a public IP is determined during instance creation.".format(assign_public_ip, instance.id))
 
@@ -1590,7 +1587,7 @@ def main():
             user_data=dict(),
             instance_tags=dict(type='dict'),
             vpc_subnet_id=dict(),
-            assign_public_ip=dict(type='bool', default=False),
+            assign_public_ip=dict(type='bool'),
             private_ip=dict(),
             instance_profile_name=dict(),
             instance_ids=dict(type='list', aliases=['instance_id']),

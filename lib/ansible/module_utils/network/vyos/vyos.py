@@ -103,25 +103,21 @@ def run_commands(module, commands, check_rc=True):
     responses = list()
     connection = get_connection(module)
 
-    for cmd in to_list(commands):
-        try:
-            cmd = json.loads(cmd)
-            command = cmd['command']
-            prompt = cmd['prompt']
-            answer = cmd['answer']
-        except:
-            command = cmd
-            prompt = None
-            answer = None
+    try:
+        outputs = connection.run_commands(commands)
+    except ConnectionError as exc:
+        if check_rc:
+            module.fail_json(msg=to_text(exc))
+        else:
+            outputs = exc
 
-        out = connection.get(command, prompt, answer)
-
+    for item in to_list(outputs):
         try:
-            out = to_text(out, errors='surrogate_or_strict')
+            item = to_text(item, errors='surrogate_or_strict')
         except UnicodeError:
-            module.fail_json(msg=u'Failed to decode output from %s: %s' % (cmd, to_text(out)))
+            module.fail_json(msg=u'Failed to decode output from %s: %s' % (item, to_text(item)))
 
-        responses.append(out)
+        responses.append(item)
 
     return responses
 
@@ -129,27 +125,10 @@ def run_commands(module, commands, check_rc=True):
 def load_config(module, commands, commit=False, comment=None):
     connection = get_connection(module)
 
-    out = connection.edit_config(commands)
+    try:
+        resp = connection.edit_config(candidate=commands, commit=commit, comment=comment)
+        resp = json.loads(resp)
+    except ConnectionError as exc:
+        module.fail_json(msg=to_text(exc))
 
-    diff = None
-    if module._diff:
-        out = connection.get('compare')
-        out = to_text(out, errors='surrogate_or_strict')
-
-        if not out.startswith('No changes'):
-            out = connection.get('show')
-            diff = to_text(out, errors='surrogate_or_strict').strip()
-
-    if commit:
-        try:
-            out = connection.commit(comment)
-        except ConnectionError:
-            connection.discard_changes()
-            module.fail_json(msg='commit failed: %s' % out)
-        else:
-            connection.get('exit')
-    else:
-        connection.discard_changes()
-
-    if diff:
-        return diff
+    return resp.get('diff')
